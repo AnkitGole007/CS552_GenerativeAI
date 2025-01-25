@@ -10,7 +10,7 @@ import os
 
 NO_OF_IMAGES = 100
 BATCH_SIZE = 16
-LR = 0.002
+LR = 0.001
 EPOCHS = 500
 
 def prepare_dataset(images):
@@ -23,9 +23,9 @@ def prepare_dataset(images):
     return DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True)
 
 class LSTM_Model(nn.Module):
-    def __init__(self, input_dim=1, hidden_dim=32, num_layers=2):
+    def __init__(self, input_dim=1, hidden_dim=128, num_layers=2):
         super(LSTM_Model, self).__init__()
-        self.lstm = nn.LSTM(input_dim, hidden_dim, num_layers, batch_first=True)
+        self.lstm = nn.LSTM(input_dim, hidden_dim, num_layers, batch_first=True, dropout=0.2)
         self.fc = nn.Linear(hidden_dim, 1)
 
     def forward(self, x):
@@ -38,6 +38,8 @@ def train(model, dataloader, epochs=EPOCHS, lr=LR):
     optimizer = optim.Adam(model.parameters(), lr=lr)
 
     for epoch in range(epochs):
+        model.train()
+        total_loss = 0
         for batch in dataloader:
             images = batch[0] # size(batch size,25)
 
@@ -50,8 +52,9 @@ def train(model, dataloader, epochs=EPOCHS, lr=LR):
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
+            total_loss += loss.item()
 
-        print(f"Epoch:{epoch+1}/{epochs} -> Loss:{loss.item()}")
+        print(f"Epoch:{epoch + 1}/{epochs} -> Loss:{total_loss / len(dataloader):.4f}")
 
 def generate_image(model, num_images=NO_OF_IMAGES):
     model.eval()
