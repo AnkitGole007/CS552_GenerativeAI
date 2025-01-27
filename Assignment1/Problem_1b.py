@@ -10,12 +10,12 @@ import os
 
 NO_OF_IMAGES = 100
 BATCH_SIZE = 16
-LR = 0.001
+LR = 0.0015
 EPOCHS = 500
 
 def prepare_dataset(images):
     images = np.array(images).astype(np.float32)
-    flatten_images = images.reshape(100,-1)
+    flatten_images = images.reshape(len(images),-1)
     unique_images = np.unique(flatten_images, axis=0)
 
     unique_images = torch.tensor(unique_images, dtype=torch.float32)
@@ -25,13 +25,13 @@ def prepare_dataset(images):
 class LSTM_Model(nn.Module):
     def __init__(self, input_dim=1, hidden_dim=128, num_layers=2):
         super(LSTM_Model, self).__init__()
-        self.lstm = nn.LSTM(input_dim, hidden_dim, num_layers, batch_first=True, dropout=0.2)
+        self.lstm = nn.LSTM(input_dim, hidden_dim, num_layers, batch_first=True)
         self.fc = nn.Linear(hidden_dim, 1)
 
-    def forward(self, x):
-        lstm_out, _ = self.lstm(x)
+    def forward(self, x, hidden=None):
+        lstm_out, hidden = self.lstm(x, hidden)
         logits = self.fc(lstm_out)
-        return logits.squeeze(-1)
+        return logits.squeeze(-1), hidden
 
 def train(model, dataloader, epochs=EPOCHS, lr=LR):
     criterion = nn.BCEWithLogitsLoss()
@@ -46,7 +46,7 @@ def train(model, dataloader, epochs=EPOCHS, lr=LR):
             inputs = torch.cat([torch.zeros(images.size(0),1), images[:,:-1]],dim=1).unsqueeze(-1)
             targets = images
 
-            outputs = model(inputs)
+            outputs, _ = model(inputs)
             loss = criterion(outputs, targets)
 
             optimizer.zero_grad()
@@ -61,17 +61,18 @@ def generate_image(model, num_images=NO_OF_IMAGES):
     generated_images = []
 
     for _ in range(num_images):
-        image = np.zeros(25)
+        image = []
+        hidden = None
         inputs = torch.zeros(1,1,1)
 
         for i in range(25):
-            logits = model(inputs)
+            logits, hidden = model(inputs, hidden)
             prob = torch.sigmoid(logits).item()
             pixel = 1 if torch.rand(1).item() < prob else 0
-            image[i] = pixel
+            image.append(pixel)
             inputs = torch.tensor([[[pixel]]], dtype=torch.float32)
 
-        generated_images.append(image.reshape(5,5))
+        generated_images.append(np.array(image).reshape(5,5))
 
     return generated_images
 
