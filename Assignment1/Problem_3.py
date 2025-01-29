@@ -90,7 +90,7 @@ def generate_graph(a, b, num_students=15, num_features=3):
     return {'X': X, 'E': E}
 
 def main():
-    with open('classroom_graphs.pkl', 'rb') as f:
+    with open('pickle/classroom_graphs.pkl', 'rb') as f:
         graphs = pickle.load(f)
 
     a, b = train_model(graphs)

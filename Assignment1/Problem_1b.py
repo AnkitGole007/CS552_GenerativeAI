@@ -85,7 +85,7 @@ def plot_images(images, rows=10, cols=10):
     plt.show()
 
 def main():
-    with open('image_cpts.pkl/cpts.pkl','rb') as f:
+    with open('pickle/image_cpts.pkl/cpts.pkl','rb') as f:
         cpts = pickle.load(f)
     images = [sample_image(cpts) for _ in range(NO_OF_IMAGES)]
     dataloader = prepare_dataset(images)
