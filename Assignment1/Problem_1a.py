@@ -2,7 +2,7 @@ import pickle
 import numpy as np
 import matplotlib.pyplot as plt
 
-with open("image_cpts.pkl/cpts.pkl", "rb") as f:
+with open("pickle/image_cpts.pkl/cpts.pkl", "rb") as f:
     cpts = pickle.load(f)
 
 def sample_image(cpts):
