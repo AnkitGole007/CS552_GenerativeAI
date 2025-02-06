@@ -6,38 +6,64 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 
-LATENT_DIM = 64
-BATCH_SIZE = 128
-LR = 0.001
-EPOCHS = 50
-BETA = 1.0
+LATENT_DIM = 128
+BATCH_SIZE = 64
+LR = 0.0005
+EPOCHS = 100
+BETA = 0.75
 
 class VAE(nn.Module):
     def __init__(self):
         super(VAE, self).__init__()
 
         #encoder
+        # self.encoder = nn.Sequential(
+        #     nn.Conv2d(1, 32, 3, stride=2, padding=1),
+        #     nn.ReLU(),
+        #     nn.Conv2d(32,64, 3,stride=2, padding=1),
+        #     nn.ReLU(),
+        #     nn.Conv2d(64,128, 3, stride=2, padding=1),
+        #     nn.ReLU(),
+        #     nn.Flatten()
+        # )
+
         self.encoder = nn.Sequential(
-            nn.Conv2d(1, 32, 3, stride=2, padding=1),
+            nn.Conv2d(1, 64, 3, stride=2, padding=1),  # More channels
+            nn.BatchNorm2d(64),  # Added BN
             nn.ReLU(),
-            nn.Conv2d(32,64, 3,stride=2, padding=1),
+            nn.Conv2d(64, 128, 3, stride=2, padding=1),
+            nn.BatchNorm2d(128),
             nn.ReLU(),
-            nn.Conv2d(64,128, 3, stride=2, padding=1),
+            nn.Conv2d(128, 256, 3, stride=2, padding=1),
+            nn.BatchNorm2d(256),
             nn.ReLU(),
             nn.Flatten()
         )
 
-        self.m = nn.Linear(128*3*3, LATENT_DIM)
-        self.log_var = nn.Linear(128*3*3, LATENT_DIM)
+        ENCODER_OUTPUT_DIM = 256 * 3 * 3
 
-        self.fc_decoder = nn.Linear(LATENT_DIM, 128*3*3)
+        self.m = nn.Linear(ENCODER_OUTPUT_DIM, LATENT_DIM)
+        self.log_var = nn.Linear(ENCODER_OUTPUT_DIM, LATENT_DIM)
+
+        self.fc_decoder = nn.Linear(LATENT_DIM, ENCODER_OUTPUT_DIM)
+
+        # self.decoder = nn.Sequential(
+        #     nn.ConvTranspose2d(128,64, 3, stride=2, padding=1, output_padding=1),
+        #     nn.ReLU(),
+        #     nn.ConvTranspose2d(64,32,3,stride=2, padding=1, output_padding=1),
+        #     nn.ReLU(),
+        #     nn.ConvTranspose2d(32, 1, 3, stride=2, padding=1, output_padding=1),
+        #     nn.Sigmoid()
+        # )
 
         self.decoder = nn.Sequential(
-            nn.ConvTranspose2d(128,64, 3, stride=2, padding=1, output_padding=1),
+            nn.ConvTranspose2d(256, 128, 3, stride=2, padding=1, output_padding=1),
+            nn.BatchNorm2d(128),  # Added BN
             nn.ReLU(),
-            nn.ConvTranspose2d(64,32,3,stride=2, padding=1, output_padding=1),
+            nn.ConvTranspose2d(128, 64, 3, stride=2, padding=1, output_padding=1),
+            nn.BatchNorm2d(64),
             nn.ReLU(),
-            nn.ConvTranspose2d(32, 1, 3, stride=2, padding=1, output_padding=1),
+            nn.ConvTranspose2d(64, 1, 3, stride=2, padding=1, output_padding=1),
             nn.Sigmoid()
         )
 
@@ -53,7 +79,7 @@ class VAE(nn.Module):
 
         z = self.parameterize(mean,log_var)
 
-        decode = self.fc_decoder(z).view(-1,128,3,3)
+        decode = self.fc_decoder(z).view(-1,256,3,3)
         decode = self.decoder(decode)
         return decode, mean, log_var
 
@@ -99,7 +125,7 @@ def main():
     vae.eval()
 
     z = torch.randn(100, LATENT_DIM).to(device)
-    generated_faces = vae.decoder(vae.fc_decoder(z).view(-1, 128, 3, 3)).cpu().detach().numpy()
+    generated_faces = vae.decoder(vae.fc_decoder(z).view(-1, 256, 3, 3)).cpu().detach().numpy()
 
     generated_faces = generated_faces.squeeze()
 
