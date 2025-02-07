@@ -6,138 +6,109 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 
-LATENT_DIM = 128
+# Hyperparameters
+LATENT_DIM = 32
 BATCH_SIZE = 64
-LR = 0.0005
-EPOCHS = 100
-BETA = 0.75
+LR = 0.001
+EPOCHS = 50
+BETA = 0.2
 
-class VAE(nn.Module):
-    def __init__(self):
-        super(VAE, self).__init__()
+class FCVAE(nn.Module):
+    def __init__(self, latent_dim=LATENT_DIM):
+        super(FCVAE, self).__init__()
+        self.latent_dim = latent_dim
 
-        #encoder
-        # self.encoder = nn.Sequential(
-        #     nn.Conv2d(1, 32, 3, stride=2, padding=1),
-        #     nn.ReLU(),
-        #     nn.Conv2d(32,64, 3,stride=2, padding=1),
-        #     nn.ReLU(),
-        #     nn.Conv2d(64,128, 3, stride=2, padding=1),
-        #     nn.ReLU(),
-        #     nn.Flatten()
-        # )
 
-        self.encoder = nn.Sequential(
-            nn.Conv2d(1, 64, 3, stride=2, padding=1),  # More channels
-            nn.BatchNorm2d(64),  # Added BN
-            nn.ReLU(),
-            nn.Conv2d(64, 128, 3, stride=2, padding=1),
-            nn.BatchNorm2d(128),
-            nn.ReLU(),
-            nn.Conv2d(128, 256, 3, stride=2, padding=1),
-            nn.BatchNorm2d(256),
-            nn.ReLU(),
-            nn.Flatten()
-        )
+        self.fc1 = nn.Linear(24 * 24, 512)
+        self.fc2 = nn.Linear(512, 256)
+        self.fc3 = nn.Linear(256, 128)
 
-        ENCODER_OUTPUT_DIM = 256 * 3 * 3
+        self.fc_mu = nn.Linear(128, latent_dim)
+        self.fc_logvar = nn.Linear(128, latent_dim)
 
-        self.m = nn.Linear(ENCODER_OUTPUT_DIM, LATENT_DIM)
-        self.log_var = nn.Linear(ENCODER_OUTPUT_DIM, LATENT_DIM)
+        self.fc4 = nn.Linear(latent_dim, 128)
+        self.fc5 = nn.Linear(128, 256)
+        self.fc6 = nn.Linear(256, 512)
+        self.fc7 = nn.Linear(512, 24 * 24)
 
-        self.fc_decoder = nn.Linear(LATENT_DIM, ENCODER_OUTPUT_DIM)
+    def encode(self, x):
+        x = x.view(x.size(0), -1)
+        h = F.relu(self.fc1(x))
+        h = F.relu(self.fc2(h))
+        h = F.relu(self.fc3(h))
 
-        # self.decoder = nn.Sequential(
-        #     nn.ConvTranspose2d(128,64, 3, stride=2, padding=1, output_padding=1),
-        #     nn.ReLU(),
-        #     nn.ConvTranspose2d(64,32,3,stride=2, padding=1, output_padding=1),
-        #     nn.ReLU(),
-        #     nn.ConvTranspose2d(32, 1, 3, stride=2, padding=1, output_padding=1),
-        #     nn.Sigmoid()
-        # )
+        mu = self.fc_mu(h)
+        logvar = self.fc_logvar(h)
+        return mu, logvar
 
-        self.decoder = nn.Sequential(
-            nn.ConvTranspose2d(256, 128, 3, stride=2, padding=1, output_padding=1),
-            nn.BatchNorm2d(128),  # Added BN
-            nn.ReLU(),
-            nn.ConvTranspose2d(128, 64, 3, stride=2, padding=1, output_padding=1),
-            nn.BatchNorm2d(64),
-            nn.ReLU(),
-            nn.ConvTranspose2d(64, 1, 3, stride=2, padding=1, output_padding=1),
-            nn.Sigmoid()
-        )
+    def reparameterize(self, mu, logvar):
+        std = torch.exp(0.5 * logvar)
+        eps = torch.randn_like(std)
+        return mu + eps * std
 
-    def parameterize(self, mean, log_var):
-        std = torch.exp(0.5*log_var)
-        eps = torch.rand_like(std)
-        return mean + eps*std
+    def decode(self, z):
+        h = F.relu(self.fc4(z))
+        h = F.relu(self.fc5(h))
+        h = F.relu(self.fc6(h))
+        out = torch.sigmoid(self.fc7(h))
+        out = out.view(-1, 1, 24, 24)
+        return out
 
     def forward(self, x):
-        encode = self.encoder(x)
-        mean = self.m(encode)
-        log_var = self.log_var(encode)
+        mu, logvar = self.encode(x)
+        z = self.reparameterize(mu, logvar)
+        reconstructed = self.decode(z)
+        return reconstructed, mu, logvar
 
-        z = self.parameterize(mean,log_var)
 
-        decode = self.fc_decoder(z).view(-1,256,3,3)
-        decode = self.decoder(decode)
-        return decode, mean, log_var
+def fc_vae_loss(reconstructed, x, mu, logvar, beta):
+    reconstruction_loss = F.binary_cross_entropy(reconstructed, x, reduction='mean')
+    kl_div = -0.5 * torch.mean(1 + logvar - mu.pow(2) - logvar.exp())
+    return reconstruction_loss + beta * kl_div
 
-def vae_loss(reconstructed, x, mean, log_var, beta):
-    re_loss = F.binary_cross_entropy(reconstructed,x,reduction='mean')
-    kl_loss = -0.5 * torch.sum(1 + log_var - mean**2 - log_var.exp())
-
-    return re_loss + beta * kl_loss
 
 def main():
     faces = np.load('faces_vae.npy')
     faces = faces.astype(np.float32) / 255.0
     faces = torch.tensor(faces).unsqueeze(1)
 
-
     dataset = TensorDataset(faces)
     dataloader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True)
 
-    print(faces.shape)
-
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    vae = VAE().to(device)
-    optimizer = optim.Adam(vae.parameters(), lr=LR)
-
-    vae.train()
+    model = FCVAE().to(device)
+    optimizer = optim.Adam(model.parameters(), lr=LR)
 
     for epoch in range(EPOCHS):
+        model.train()
         total_loss = 0
         for batch in dataloader:
             x = batch[0].to(device)
             optimizer.zero_grad()
-
-            reconstructed, mean, log_var = vae(x)
-            loss = vae_loss(reconstructed, x, mean, log_var, beta=BETA)
-
+            reconstructed, mu, logvar = model(x)
+            loss = fc_vae_loss(reconstructed, x, mu, logvar, BETA)
             loss.backward()
             optimizer.step()
-            total_loss += loss.item()
+            total_loss += loss.item() * x.size(0)
+        avg_loss = total_loss / len(dataset)
+        print(f"Epoch {epoch + 1}/{EPOCHS}, Loss: {avg_loss:.4f}")
 
-        print(f"Epoch {epoch+1}/{EPOCHS}, Loss: {total_loss:.2f}")
+    torch.save(model.state_dict(), "fc_vae_model.pth")
 
-    torch.save(vae.state_dict(),"vae_model.pth")
-    vae.eval()
+    model.eval()
+    with torch.no_grad():
+        z = torch.randn(100, LATENT_DIM).to(device)
+        generated_faces = model.decode(z).cpu()
+        generated_faces = generated_faces.squeeze(1)
 
-    z = torch.randn(100, LATENT_DIM).to(device)
-    generated_faces = vae.decoder(vae.fc_decoder(z).view(-1, 256, 3, 3)).cpu().detach().numpy()
-
-    generated_faces = generated_faces.squeeze()
-
-    # 10x10 Collage
     fig, axes = plt.subplots(10, 10, figsize=(10, 10))
     for i, ax in enumerate(axes.flat):
-        ax.imshow(generated_faces[i], cmap='gray')
+        ax.imshow(generated_faces[i], cmap='gray', vmin=0, vmax=1)
         ax.axis('off')
-
     plt.tight_layout()
-    plt.savefig("generated_faces.png")  # Save the image
+    plt.savefig("fc_generated_faces.png", dpi=300)
     plt.show()
+
 
 if __name__ == '__main__':
     main()
