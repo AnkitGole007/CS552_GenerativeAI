@@ -8,10 +8,10 @@ import torch.optim as optim
 
 # Hyperparameters
 LATENT_DIM = 32
-BATCH_SIZE = 64
+BATCH_SIZE = 128
 LR = 0.001
-EPOCHS = 50
-BETA = 0.2
+EPOCHS = 100
+BETA = 0.1
 
 class FCVAE(nn.Module):
     def __init__(self, latent_dim=LATENT_DIM):
@@ -106,7 +106,7 @@ def main():
         ax.imshow(generated_faces[i], cmap='gray', vmin=0, vmax=1)
         ax.axis('off')
     plt.tight_layout()
-    plt.savefig("fc_generated_faces.png", dpi=300)
+    plt.savefig("fcvae_generated_faces.png", dpi=300)
     plt.show()
 
 
