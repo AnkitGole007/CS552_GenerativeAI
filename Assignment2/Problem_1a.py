@@ -5,16 +5,10 @@ import matplotlib.pyplot as plt
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-
-# Hyperparameters
-LATENT_DIM = 32
-BATCH_SIZE = 128
-LR = 0.001
-EPOCHS = 100
-BETA = 0.1
+from configs import *
 
 class FCVAE(nn.Module):
-    def __init__(self, latent_dim=LATENT_DIM):
+    def __init__(self, latent_dim):
         super(FCVAE, self).__init__()
         self.latent_dim = latent_dim
 
@@ -60,7 +54,6 @@ class FCVAE(nn.Module):
         reconstructed = self.decode(z)
         return reconstructed, mu, logvar
 
-
 def fc_vae_loss(reconstructed, x, mu, logvar, beta):
     reconstruction_loss = F.binary_cross_entropy(reconstructed, x, reduction='mean')
     kl_div = -0.5 * torch.mean(1 + logvar - mu.pow(2) - logvar.exp())
@@ -76,7 +69,7 @@ def main():
     dataloader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = FCVAE().to(device)
+    model = FCVAE(LATENT_DIM_FCVAE).to(device)
     optimizer = optim.Adam(model.parameters(), lr=LR)
 
     for epoch in range(EPOCHS):
@@ -93,11 +86,11 @@ def main():
         avg_loss = total_loss / len(dataset)
         print(f"Epoch {epoch + 1}/{EPOCHS}, Loss: {avg_loss:.4f}")
 
-    torch.save(model.state_dict(), "fc_vae_model.pth")
+    torch.save(model.state_dict(), "models/fc_vae_model.pth")
 
     model.eval()
     with torch.no_grad():
-        z = torch.randn(100, LATENT_DIM).to(device)
+        z = torch.randn(100, LATENT_DIM_FCVAE).to(device)
         generated_faces = model.decode(z).cpu()
         generated_faces = generated_faces.squeeze(1)
 
@@ -106,7 +99,7 @@ def main():
         ax.imshow(generated_faces[i], cmap='gray', vmin=0, vmax=1)
         ax.axis('off')
     plt.tight_layout()
-    plt.savefig("fcvae_generated_faces.png", dpi=300)
+    plt.savefig("outputs/fcvae_generated_faces.png", dpi=300)
     plt.show()
 
 
