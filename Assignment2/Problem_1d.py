@@ -26,7 +26,7 @@ def latent_space(vae, num_steps=20):
         ax.axis("off")
 
     plt.tight_layout()
-    plt.savefig("outputs/latent_10x2.png")
+    plt.savefig("outputs/latent.png")
     plt.show()
 
 latent_space(vae)
