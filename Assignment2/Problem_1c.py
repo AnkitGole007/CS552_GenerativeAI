@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
 from Problem_1a import FCVAE
 from Problem_1b import FCAE
+from configs import *
 
 faces = np.load('faces_vae.npy').astype(np.float32) / 255.0
 faces = torch.tensor(faces).unsqueeze(1)
@@ -12,7 +13,7 @@ faces = torch.tensor(faces).unsqueeze(1)
 dataset = TensorDataset(faces)
 dataloader = DataLoader(dataset, batch_size=128, shuffle=False)
 
-vae_model = FCVAE()  # instantiate the model architecture
+vae_model = FCVAE(LATENT_DIM_FCVAE)  # instantiate the model architecture
 vae_model.load_state_dict(torch.load('models/fc_vae_model.pth'))
 vae_model.eval()
 latent_codes_vae = []
@@ -24,7 +25,7 @@ with torch.no_grad():
         latent_codes_vae.append(mu.cpu().numpy())
 latent_codes_vae = np.concatenate(latent_codes_vae, axis=0)
 
-ae_model = FCAE()
+ae_model = FCAE(LATENT_DIM_FCAE)
 ae_model.load_state_dict(torch.load('models/fc_ae_model.pth'))
 ae_model.eval()
 latent_codes_ae = []
