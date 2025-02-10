@@ -5,18 +5,12 @@ import matplotlib.pyplot as plt
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-
-# Hyperparameters
-LATENT_DIM = 200
-BATCH_SIZE = 128
-LR = 0.001
-EPOCHS = 150
+from configs import *
 
 class FCAE(nn.Module):
     def __init__(self, latent_dim):
         super(FCAE, self).__init__()
         self.latent_dim = latent_dim
-
 
         self.fc1 = nn.Linear(24 * 24, 512)
         self.fc2 = nn.Linear(512, 256)
@@ -63,7 +57,7 @@ def main():
     dataloader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = FCAE(LATENT_DIM).to(device)
+    model = FCAE(LATENT_DIM_FCAE).to(device)
     optimizer = optim.Adam(model.parameters(), lr=LR)
 
     for epoch in range(EPOCHS):
@@ -84,7 +78,7 @@ def main():
 
     model.eval()
     with torch.no_grad():
-        z = torch.randn(100, LATENT_DIM).to(device)
+        z = torch.randn(100, LATENT_DIM_FCAE).to(device)
         generated_faces = model.decode(z).cpu()
         generated_faces = generated_faces.squeeze(1)
 
